@@ -9,6 +9,10 @@ import { useEffect, useState } from 'react'
 import { CircleCheckBig } from 'lucide-react'
 import { X } from 'lucide-react'
 import { SquareChevronRight } from 'lucide-react'
+import ReactMarkdown from "react-markdown"
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { oneDark } from 'react-syntax-highlighter/dist/cjs/styles/prism';
+import remarkGfm from 'remark-gfm';
 
 function App() {
   const [chats , setChats] = useState([])
@@ -18,11 +22,39 @@ function App() {
   const [currChat,setCurrChat] = useState("")
   const [newChat,setNewChat] = useState(false)
   const [sideBarCollapse, setSideBarCollapse] = useState(false)
+  const[messages , setMessages] = useState([])
+  const [userReq , setUserReq] = useState("")
+  const[prevMessages, setPrevMessages] = useState([])
+  const [responseLoading,setResponseLoading] = useState(false)
+  const markDownComponent = {
+        code({ inline, className, children, ...props }) {
+          const match = /language-(\w+)/.exec(className || '');
+          if (!inline && match) {
+            return (
+              <SyntaxHighlighter
+                style={oneDark}
+                language={match[1]}
+                showLineNumbers
+                wrapLongLines
+                {...props}
+              >
+                {String(children).replace(/\n$/, '')}
+              </SyntaxHighlighter>
+            );
+          }
+          return (
+            <code className={className} {...props}>
+              {children}
+            </code>
+          );
+        },
+      } 
 
   const showTitle = ()=>{
     setTitleWindow(true) 
   }
 
+  
   useEffect( ()=>{
     (async ()=>{
       try {
@@ -38,8 +70,60 @@ function App() {
     })()
   },[])
 
+  useEffect(()=>{
+    (async()=>{
+      if (!currChat){
+        return
+      }
+      try {
+        const res = await axios.get(`${import.meta.env.VITE_BACKEND_URI}/chat/get-chatMessage/`,{
+          params:{
+            chatId : currChat
+          }
+        })
+        console.log(res);
+        setPrevMessages(res.data.data)
+        if (res.data.data.length !=0){
+          setNewChat(false)
+        }else{
+          setNewChat(true)
+        }
+        
+      } catch (error) {
+        console.log(error);
+        
+      }
+    })()
+  },[currChat])
+  const submitRequest = async (req)=>{
+    const content = req || undefined
+    if (!content){
+      console.log("no content to send");
+      return
+    }
+    if(!currChat){
+      console.log("please select or create a char");
+      return
+      
+    }
+    setMessages((prev)=> [...prev,{content , from : "user"}])
+    setNewChat(false)
+   try {
+    setResponseLoading(true)
+     const res = await axios.post(`${import.meta.env.VITE_BACKEND_URI}/chat/send-request`,{
+      userReq: content,
+      chatId : currChat
+     })
+     setResponseLoading(false)
+     setMessages((prev)=>[...prev,{content : res.data.data , from:"ai"}])
+    console.log(res);
+   } catch (error) {
+    console.log(error);
+    
+   }
+    
+  }
   const createNewChat = async(title)=>{
-   
     const chatTitle = title || "Anonomous Chat"
     const response =await axios.post(`${import.meta.env.VITE_BACKEND_URI}/chat/create-new`,{
       title : chatTitle
@@ -78,7 +162,7 @@ function App() {
     </div>
   </div>
 )}
-    <div className={`sideBar select-none  overflow-y-auto bg-[#1e1e1e] $$`}>
+    <div className={`sideBar select-none  overflow-y-auto bg-[#1e1e1e] `}>
       {sideBarCollapse? (<div className=''>
           <ul className='flex flex-col  mt-6 justify-around px-2.5 gap-3'>
           <li onClick={()=> showTitle()} className='text-gray-300 hover:bg-gray-700 p-2 rounded-3xl active:bg-gray-600'><BotMessageSquare color='#ffffff' className='float-left p-0.5 mr-2'/></li>
@@ -107,23 +191,64 @@ function App() {
             {chats.map((chat)=>{
             return <li onClick={()=>{
               setCurrChat(chat._id)
-              setNewChat(true)
+              setMessages([])
+              if (prevMessages.length === 0){
+                setNewChat(true)
+              }
             }} key={chat._id} className={`text-gray-300  mt-1.5 mb-1.5 p-2 min-w-full hover:bg-gray-700 rounded-md active:bg-gray-600 ${(chat._id === currChat)? "bg-[#363434ea] ":""}`}>{chat.title}</li>
           })}
           </ul>
         </div>
       </div>)}
     </div>
-    <div className={`responseArea  relative`}>
+    <div className={`responseArea  relative overflow-y-hidden`}>
       {newChat && (
           <span className='text-2xl  text-gray-300 absolute left-1/2 top-1/2 '>Ready to dive in?</span>
         )}
+
+        <div className='messageArea  overflow-y-auto max-h-11/12 w-full'>
+          {prevMessages && (
+            <div>
+              {prevMessages.map((message,i)=>{
+              return (
+                <div key={i} className='flex flex-col w-full'>
+                  <span className={`inline-block text-gray-300 px-10 py-2 w-fit self-end bg-[#333333] p-1.5 rounded-2xl my-2`}>{message.userRequest}</span>
+                  <span className={`inline-block text-gray-300 px-10 py-2`}>
+                    <ReactMarkdown components={markDownComponent}  remarkPlugins={[remarkGfm]}>{message.aiResponse}</ReactMarkdown></span>
+                </div>
+              )
+            })}
+            </div>
+          )}
+          {messages && (
+            <ul className='flex flex-col justify-around  pb-24 '>
+              {messages && messages.map((message,i)=>{
+              return(
+                <li key={i} className={`text-gray-300 px-10 py-2 ${message.from === "user" ? "inline-block w-fit self-end bg-[#333333] p-1.5 rounded-2xl my-2":""}`}><ReactMarkdown components={markDownComponent}  remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown></li>
+
+              )
+            })}
+            {responseLoading && (
+              <span className='text-gray-300 px-10 py-2 '> Loading... </span>
+            )}
+            </ul>
+            
+          )}
+          
+        </div>
       <div className='absolute bottom-2.5 min-w-full flex justify-center '>
         
-        <div className='flex w-3/4 border-gray-900 shadow-gray-700 rounded-4xl bg-[#333333] px-2'>
-          <input type='text' placeholder="what's on you mind today ?" className='w-full p-3   text-gray-300 outline-none '/>
-        <button><Send color='white' className='hover:bg-gray-600 p-1 rounded-3xl'/></button>
-        </div>
+        <form onSubmit={(e)=>{
+          e.preventDefault()
+          setUserReq("")
+          submitRequest(userReq)
+        }} className='flex w-3/4 border-gray-900 shadow-gray-700 rounded-4xl bg-[#333333] px-2'>
+          <input value={userReq} onChange={(e)=>{
+            setUserReq(e.currentTarget.value)
+
+          }} type='text' placeholder="what's on you mind today ?" className='w-full p-3   text-gray-300 outline-none '/>
+        <button type='submit'><Send color='white' className='hover:bg-gray-600 p-1 rounded-3xl'/></button>
+        </form>
 
       </div>
     </div>

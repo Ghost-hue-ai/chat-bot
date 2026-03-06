@@ -9,7 +9,6 @@ const chatSchema = mongoose.Schema(
       {
         userRequest: String,
         aiResponse: String,
-        created_at: Date,
       },
     ],
   },

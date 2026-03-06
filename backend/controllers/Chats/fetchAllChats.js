@@ -4,7 +4,11 @@ const fetchAllChats = async (req, res) => {
   try {
     const chats = await ChatModel.find({});
     if (chats.length === 0) {
-      throw new ApiError("failed loading chats", 500);
+      return res.status(200).json({
+        message: "No chats yet",
+        success: true,
+        data: [],
+      });
     }
     return res.status(200).json({
       message: "successfully fetched chats",
@@ -23,6 +27,7 @@ const fetchAllChats = async (req, res) => {
         success: false,
       });
     }
+    console.log(error);
   }
 };
 

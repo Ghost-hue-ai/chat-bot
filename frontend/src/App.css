@@ -15,3 +15,18 @@
 .sideBar::-webkit-scrollbar-thumb:hover {
   background: #777;
 }
+
+.messageArea::-webkit-scrollbar{
+  width: 6px;
+
+}
+.messageArea::-webkit-scrollbar-track{
+  background-color:#262626; ;
+}
+.messageArea::-webkit-scrollbar-thumb{
+  background: #777;
+  border-radius: 10px;
+}
+.messageArea::-webkit-scrollbar-thumb:hover {
+  background: #777;
+}
